@@ -1,3 +1,7 @@
+import yaml
+from yaml.loader import SafeLoader
+import streamlit_authenticator as stauth
+
 import io
 import re
 import pandas as pd
@@ -148,10 +152,47 @@ def to_excel_bytes(df: pd.DataFrame) -> bytes:
         df.to_excel(writer, index=False, sheet_name="Bundles")
     return bio.getvalue()
 
+def require_login():
+    """
+    Blocks the app until user is authenticated.
+    Reads config from config.yaml (local) OR st.secrets["auth_config"] (deployed).
+    """
+    # Prefer Streamlit secrets if available (best for deployment)
+    if "auth_config" in st.secrets:
+        config = yaml.load(st.secrets["auth_config"], Loader=SafeLoader)
+    else:
+        # Local file
+        with open("config.yaml", "r", encoding="utf-8") as f:
+            config = yaml.load(f, Loader=SafeLoader)
+
+    authenticator = stauth.Authenticate(
+        config["credentials"],
+        config["cookie"]["name"],
+        config["cookie"]["key"],
+        config["cookie"]["expiry_days"],
+    )
+
+    # Render login
+    authenticator.login()
+
+    status = st.session_state.get("authentication_status")
+
+    if status is True:
+        authenticator.logout("Logout", "sidebar")
+        return True
+    elif status is False:
+        st.error("Username or password is incorrect")
+        st.stop()
+    else:
+        st.warning("Please log in to continue")
+        st.stop()
+
 
 def main() -> None:
     st.set_page_config(page_title=APP_TITLE, layout="wide")
     st.title(APP_TITLE)
+
+require_login()
 
     # ✅ Home page: template download
     template_bytes = make_template_bytes()
