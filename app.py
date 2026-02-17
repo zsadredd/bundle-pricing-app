@@ -1,11 +1,12 @@
-import yaml
-from yaml.loader import SafeLoader
-import streamlit_authenticator as stauth
-
+import os
 import io
 import re
+import yaml
 import pandas as pd
+from yaml.loader import SafeLoader
 import streamlit as st
+import streamlit_authenticator as stauth
+
 
 APP_TITLE = "Bundle Pricing (Private)"
 
@@ -155,13 +156,19 @@ def to_excel_bytes(df: pd.DataFrame) -> bytes:
 def require_login():
     """
     Blocks the app until user is authenticated.
-    Reads config from config.yaml (local) OR st.secrets["auth_config"] (deployed).
+    Uses .streamlit/secrets.toml if present, else uses local config.yaml
     """
-    # Prefer Streamlit secrets if available (best for deployment)
-    if "auth_config" in st.secrets:
+
+    # ✅ Safe check: only read st.secrets if secrets.toml exists
+    secrets_paths = [
+        os.path.join(os.path.expanduser("~"), ".streamlit", "secrets.toml"),
+        os.path.join(os.getcwd(), ".streamlit", "secrets.toml"),
+    ]
+    secrets_exists = any(os.path.exists(p) for p in secrets_paths)
+
+    if secrets_exists:
         config = yaml.load(st.secrets["auth_config"], Loader=SafeLoader)
     else:
-        # Local file
         with open("config.yaml", "r", encoding="utf-8") as f:
             config = yaml.load(f, Loader=SafeLoader)
 
@@ -172,7 +179,6 @@ def require_login():
         config["cookie"]["expiry_days"],
     )
 
-    # Render login
     authenticator.login()
 
     status = st.session_state.get("authentication_status")
@@ -192,7 +198,7 @@ def main() -> None:
     st.set_page_config(page_title=APP_TITLE, layout="wide")
     st.title(APP_TITLE)
 
-require_login()
+    require_login()
 
     # ✅ Home page: template download
     template_bytes = make_template_bytes()
