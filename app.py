@@ -1,3 +1,5 @@
+import base64
+from pathlib import Path
 import os
 import io
 import re
@@ -8,7 +10,7 @@ import streamlit as st
 import streamlit_authenticator as stauth
 
 
-APP_TITLE = "Bundle Pricing (Private)"
+APP_TITLE = "Rate Plan Studio"
 
 DEFAULT_DATA_TIERS_GB = [1, 2, 3, 5, 10, 15, 20, 30, 50]
 DEFAULT_VALIDITY_DAYS = [1, 3, 5, 7, 10, 15, 30, 60, 90]
@@ -193,9 +195,127 @@ def require_login():
         st.warning("Please log in to continue")
         st.stop()
 
+def apply_ui(bg_path="assets/bg.jpg", logo_path="assets/logo.png"):
+    """
+    Adds background image, Google font, nicer spacing + card look.
+    Works local + GitHub deployments (as long as assets/ exists).
+    """
+    bg_file = Path(bg_path)
+    logo_file = Path(logo_path)
+
+    bg_b64 = ""
+    if bg_file.exists():
+        bg_b64 = base64.b64encode(bg_file.read_bytes()).decode()
+
+    logo_b64 = ""
+    if logo_file.exists():
+        logo_b64 = base64.b64encode(logo_file.read_bytes()).decode()
+
+    bg_css = ""
+    if bg_b64:
+        bg_css = f"""
+        .stApp {{
+            background:
+              linear-gradient(rgba(10, 15, 30, 0.78), rgba(10, 15, 30, 0.78)),
+              url("data:image/jpg;base64,{bg_b64}");
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+        }}
+        """
+
+    st.markdown(
+        f"""
+        <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+
+        html, body, [class*="css"] {{
+            font-family: 'Inter', sans-serif !important;
+        }}
+
+        {bg_css}
+
+        /* Remove Streamlit default padding a bit */
+        .block-container {{
+            padding-top: 2rem;
+            padding-bottom: 3rem;
+        }}
+
+        /* Glass card container */
+        .card {{
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 18px;
+            padding: 18px 18px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+            backdrop-filter: blur(10px);
+        }}
+
+        /* Bigger headings */
+        h1 {{
+            font-weight: 800 !important;
+            letter-spacing: -0.02em;
+        }}
+        h2, h3 {{
+            font-weight: 700 !important;
+        }}
+
+        /* Sidebar styling */
+        [data-testid="stSidebar"] > div {{
+            background: rgba(17, 24, 39, 0.65);
+            border-right: 1px solid rgba(255,255,255,0.08);
+            backdrop-filter: blur(10px);
+        }}
+
+        /* Buttons */
+        .stButton button, .stDownloadButton button {{
+            border-radius: 12px !important;
+            padding: 0.6rem 1rem !important;
+            font-weight: 700 !important;
+        }}
+
+        /* Inputs */
+        .stSelectbox, .stNumberInput, .stMultiSelect {{
+            border-radius: 12px;
+        }}
+
+        /* Hide footer/menu (optional) */
+        #MainMenu {{visibility: hidden;}}
+        footer {{visibility: hidden;}}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # Optional nice header area (uses logo if present)
+    if logo_b64:
+        st.markdown(
+            f"""
+            <div class="card" style="display:flex;gap:16px;align-items:center;margin-bottom:18px;">
+              <img src="data:image/png;base64,{logo_b64}" style="width:152px;height:152px;border-radius:12px;" />
+              <div>
+                <div style="font-size:22px;font-weight:800;">Rate Plan Studio</div>
+                <div style="opacity:0.85;">Upload Excel → choose country → set margin → generate bundles</div>
+              </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown(
+            """
+            <div class="card" style="margin-bottom:18px;">
+              <div style="font-size:22px;font-weight:800;">Rate Plan Studio</div>
+              <div style="opacity:0.85;">Upload Excel → choose country → set margin → generate bundles</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
 
 def main() -> None:
     st.set_page_config(page_title=APP_TITLE, layout="wide")
+    apply_ui()
     st.title(APP_TITLE)
 
     require_login()
