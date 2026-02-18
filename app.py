@@ -156,21 +156,16 @@ def to_excel_bytes(df: pd.DataFrame) -> bytes:
     return bio.getvalue()
 
 def require_login():
-    """
-    Blocks the app until user is authenticated.
-    Uses .streamlit/secrets.toml if present, else uses local config.yaml
-    """
+    # 1) Try Streamlit Cloud secrets first
+    try:
+        auth_blob = st.secrets.get("auth_config", None)
+    except Exception:
+        auth_blob = None
 
-    # ✅ Safe check: only read st.secrets if secrets.toml exists
-    secrets_paths = [
-        os.path.join(os.path.expanduser("~"), ".streamlit", "secrets.toml"),
-        os.path.join(os.getcwd(), ".streamlit", "secrets.toml"),
-    ]
-    secrets_exists = any(os.path.exists(p) for p in secrets_paths)
-
-    if secrets_exists:
-        config = yaml.load(st.secrets["auth_config"], Loader=SafeLoader)
+    if auth_blob:
+        config = yaml.load(auth_blob, Loader=SafeLoader)
     else:
+        # 2) Fallback to local config.yaml
         with open("config.yaml", "r", encoding="utf-8") as f:
             config = yaml.load(f, Loader=SafeLoader)
 
@@ -182,7 +177,6 @@ def require_login():
     )
 
     authenticator.login()
-
     status = st.session_state.get("authentication_status")
 
     if status is True:
@@ -194,6 +188,7 @@ def require_login():
     else:
         st.warning("Please log in to continue")
         st.stop()
+
 
 def apply_ui(bg_path="assets/bg.jpg", logo_path="assets/logo.png"):
     """
