@@ -156,18 +156,22 @@ def to_excel_bytes(df: pd.DataFrame) -> bytes:
     return bio.getvalue()
 
 def require_login():
-    # 1) Try Streamlit Cloud secrets first
+    # 1) Try Streamlit secrets first (works on Streamlit Cloud)
+    auth_blob = None
     try:
-        auth_blob = st.secrets.get("auth_config", None)
+        auth_blob = st.secrets.get("auth_config")
     except Exception:
         auth_blob = None
 
     if auth_blob:
         config = yaml.load(auth_blob, Loader=SafeLoader)
-    else:
-        # 2) Fallback to local config.yaml
+    elif os.path.exists("config.yaml"):
+        # 2) Local fallback (for your PC only)
         with open("config.yaml", "r", encoding="utf-8") as f:
             config = yaml.load(f, Loader=SafeLoader)
+    else:
+        st.error("Login config missing. Add Streamlit Secret 'auth_config' or create local config.yaml.")
+        st.stop()
 
     authenticator = stauth.Authenticate(
         config["credentials"],
@@ -188,6 +192,7 @@ def require_login():
     else:
         st.warning("Please log in to continue")
         st.stop()
+
 
 
 def apply_ui(bg_path="assets/bg.jpg", logo_path="assets/logo.png"):
