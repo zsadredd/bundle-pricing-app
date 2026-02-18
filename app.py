@@ -3,9 +3,9 @@ from pathlib import Path
 import os
 import io
 import re
-import yaml
+
 import pandas as pd
-from yaml.loader import SafeLoader
+
 import streamlit as st
 import streamlit_authenticator as stauth
 
@@ -155,32 +155,36 @@ def to_excel_bytes(df: pd.DataFrame) -> bytes:
         df.to_excel(writer, index=False, sheet_name="Bundles")
     return bio.getvalue()
 
-def require_login():
-    # 1) Try Streamlit secrets first (works on Streamlit Cloud)
-    auth_blob = None
-    try:
-        auth_blob = st.secrets.get("auth_config")
-    except Exception:
-        auth_blob = None
+def _to_dict(x):
+    # streamlit secrets objects behave like mappings; make a plain dict recursively
+    if isinstance(x, dict):
+        return {k: _to_dict(v) for k, v in x.items()}
+    if isinstance(x, list):
+        return [_to_dict(v) for v in x]
+    return x
 
-    if auth_blob:
-        config = yaml.load(auth_blob, Loader=SafeLoader)
-    elif os.path.exists("config.yaml"):
-        # 2) Local fallback (for your PC only)
-        with open("config.yaml", "r", encoding="utf-8") as f:
-            config = yaml.load(f, Loader=SafeLoader)
-    else:
-        st.error("Login config missing. Add Streamlit Secret 'auth_config' or create local config.yaml.")
+
+def require_login():
+    if "auth" not in st.secrets:
+        st.error("Missing Streamlit secret: [auth]. Add it in Streamlit Cloud → Manage app → Secrets.")
         st.stop()
 
+    auth = _to_dict(st.secrets["auth"])
+
     authenticator = stauth.Authenticate(
-        config["credentials"],
-        config["cookie"]["name"],
-        config["cookie"]["key"],
-        config["cookie"]["expiry_days"],
+        auth["credentials"],
+        auth["cookie"]["name"],
+        auth["cookie"]["key"],
+        auth["cookie"]["expiry_days"],
+        auth.get("preauthorized", {}).get("emails", []),
     )
 
-    authenticator.login()
+    # Support different authenticator versions
+    try:
+        authenticator.login()
+    except TypeError:
+        authenticator.login("Login", "main")
+
     status = st.session_state.get("authentication_status")
 
     if status is True:
